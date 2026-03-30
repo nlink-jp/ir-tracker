@@ -26,6 +26,54 @@ def _ts_to_seconds(ts: str) -> float:
     return float(ts.split(".")[0])
 
 
+def _split_dense_window(
+    timestamps: list[str],
+    rate_change_factor: float,
+    min_messages: int,
+) -> list[list[str]]:
+    """Split a window at the point of maximum rate change.
+
+    Divides the window into two halves at each candidate split point and
+    compares message rates. If the ratio exceeds rate_change_factor,
+    splits at the point with the highest ratio.
+
+    Only splits if both resulting halves have >= min_messages.
+    Returns a list of 1 or 2 sub-windows.
+    """
+    n = len(timestamps)
+    if n < min_messages * 2:
+        return [timestamps]
+
+    secs = [_ts_to_seconds(ts) for ts in timestamps]
+    total_span = secs[-1] - secs[0]
+    if total_span <= 0:
+        return [timestamps]
+
+    best_ratio = 0.0
+    best_split = -1
+
+    for i in range(min_messages, n - min_messages + 1):
+        left_span = secs[i - 1] - secs[0]
+        right_span = secs[-1] - secs[i]
+
+        if left_span <= 0 or right_span <= 0:
+            continue
+
+        left_rate = i / left_span
+        right_rate = (n - i) / right_span
+
+        if left_rate > 0 and right_rate > 0:
+            ratio = max(left_rate / right_rate, right_rate / left_rate)
+            if ratio > best_ratio:
+                best_ratio = ratio
+                best_split = i
+
+    if best_ratio >= rate_change_factor and best_split > 0:
+        return [timestamps[:best_split], timestamps[best_split:]]
+
+    return [timestamps]
+
+
 def build_segments(
     storage: Storage,
     window_minutes: int = DEFAULT_WINDOW_MINUTES,
@@ -39,7 +87,7 @@ def build_segments(
     1. Fixed time windows
     2. Gap detection (split at gaps > threshold)
     3. Merge sparse windows (< min_messages)
-    4. (Future: entropy-based split for dense windows)
+    4. Split dense windows at activity rate inflection points
 
     Returns a list of SegmentBounds, sorted chronologically.
     """
@@ -92,9 +140,14 @@ def build_segments(
         merged[-2].extend(merged[-1])
         merged.pop()
 
+    # Step 4: Split dense windows at rate change inflection points
+    split: list[list[str]] = []
+    for window in merged:
+        split.extend(_split_dense_window(window, rate_change_factor, min_messages))
+
     # Convert to SegmentBounds
     segments = []
-    for window in merged:
+    for window in split:
         if window:
             segments.append(SegmentBounds(
                 start_ts=window[0],

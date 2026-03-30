@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0] - 2026-03-31
+
+### Added
+- Entropy-based dense window splitting (Step 4 of segmentation algorithm)
+- Split windows at activity rate inflection points when rate change exceeds `rate_change_factor` (default 3x)
+- Tests for dense window split and uniform rate no-split cases (20 tests total)
+
 ## [0.1.3] - 2026-03-31
 
 ### Changed

@@ -83,3 +83,32 @@ def test_empty_database():
     segs = build_segments(s)
     assert len(segs) == 0
     s.close()
+
+
+def test_split_dense_window():
+    """A window with a 4x rate change should be split at the inflection point."""
+    base = 1711234567
+    # Slow phase: 4 messages over 10 minutes (0.4 msg/min)
+    slow = [f"{base + i * 150}.000001" for i in range(4)]
+    # Fast phase: 8 messages over 2 minutes (4 msg/min) — 10x rate change
+    fast_start = base + 600  # 10 min in
+    fast = [f"{fast_start + i * 15}.000001" for i in range(8)]
+    timestamps = slow + fast
+
+    s, _ = _make_storage_with_messages(timestamps)
+    segs = build_segments(s, window_minutes=30, rate_change_factor=3.0)
+    assert len(segs) == 2
+    assert segs[0].message_count + segs[1].message_count == 12
+    s.close()
+
+
+def test_no_split_when_rate_uniform():
+    """Uniform rate should not trigger a split."""
+    base = 1711234567
+    # 10 messages evenly spaced over 10 minutes
+    timestamps = [f"{base + i * 60}.000001" for i in range(10)]
+    s, _ = _make_storage_with_messages(timestamps)
+    segs = build_segments(s, window_minutes=30, rate_change_factor=3.0)
+    assert len(segs) == 1
+    assert segs[0].message_count == 10
+    s.close()
