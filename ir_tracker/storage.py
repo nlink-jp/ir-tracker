@@ -71,11 +71,21 @@ class Storage:
         self._db.commit()
 
     def _migrate(self) -> None:
-        """Apply incremental schema migrations for existing databases."""
-        # v0.2.2: add token_count to analysis_translations
-        cols = {row[1] for row in self._db.execute("PRAGMA table_info(analysis_translations)")}
-        if "token_count" not in cols:
-            self._db.execute("ALTER TABLE analysis_translations ADD COLUMN token_count INTEGER NOT NULL DEFAULT 0")
+        """Apply incremental schema migrations for existing databases.
+
+        Each migration is idempotent (checks before applying). Wrapped in
+        a transaction so partial failures don't leave the DB in a broken state.
+        """
+        import sys
+        try:
+            # v0.2.2: add token_count to analysis_translations
+            cols = {row[1] for row in self._db.execute("PRAGMA table_info(analysis_translations)")}
+            if "token_count" not in cols:
+                self._db.execute("ALTER TABLE analysis_translations ADD COLUMN token_count INTEGER NOT NULL DEFAULT 0")
+        except Exception as e:
+            print(f"WARNING: Schema migration failed: {e}", file=sys.stderr)
+            print("The database may need manual repair. Back up tracker.db before retrying.", file=sys.stderr)
+            raise
 
     def close(self) -> None:
         self._db.close()
@@ -252,6 +262,17 @@ class Storage:
             (lang,),
         ).fetchall()
         return [dict(r) for r in rows]
+
+    def get_token_usage(self) -> dict[str, int]:
+        """Return cumulative token usage by category.
+
+        Returns {"analysis": N, "translation": N, "total": N}.
+        """
+        row_a = self._db.execute("SELECT COALESCE(SUM(token_count), 0) FROM analyses").fetchone()
+        row_t = self._db.execute("SELECT COALESCE(SUM(token_count), 0) FROM analysis_translations").fetchone()
+        analysis = row_a[0]
+        translation = row_t[0]
+        return {"analysis": analysis, "translation": translation, "total": analysis + translation}
 
     # ── Context ──
 

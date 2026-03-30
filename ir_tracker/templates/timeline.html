@@ -29,6 +29,13 @@
       <div><span class="badge badge-{{ stats.current_severity }}">{{ stats.current_severity | upper }}</span></div>
     </div>
     {% endif %}
+    {% if stats.tokens and stats.tokens.total > 0 %}
+    <div class="stat">
+      <div class="number">{{ "{:,}".format(stats.tokens.total) }}</div>
+      <div class="label">Tokens</div>
+      <div class="token-detail">Pro {{ "{:,}".format(stats.tokens.analysis) }} / Flash {{ "{:,}".format(stats.tokens.translation) }}</div>
+    </div>
+    {% endif %}
   </div>
   {% if stats.time_range %}
   <div style="color: var(--text-secondary); font-size: 13px; margin-top: 8px;">

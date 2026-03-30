@@ -196,6 +196,7 @@ def create_app(db_path: str) -> FastAPI:
                         _ts_to_display(time_range[0]),
                         _ts_to_display(time_range[1]),
                     ) if time_range else None,
+                    "tokens": storage.get_token_usage(),
                 },
                 "cumulative": cumulative,
             })

@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.3] - 2026-03-31
+
+### Added
+- Token usage display in Web UI stats bar (Pro/Flash breakdown)
+- Migration failure safety: error logging with recovery guidance
+
 ## [0.2.2] - 2026-03-31
 
 ### Added
