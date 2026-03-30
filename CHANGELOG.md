@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.1] - 2026-03-31
+
+### Fixed
+- Support scli `channel export` format (`timestamp_unix`, `post_type`, `thread_timestamp_unix`)
+- Ingest now transparently handles both stail/scat and scli export formats
+
 ## [0.1.0] - 2026-03-31
 
 ### Added
