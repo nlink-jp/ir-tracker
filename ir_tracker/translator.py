@@ -128,4 +128,52 @@ def translate_pending(storage: Storage, lang: str, verbose: bool = False) -> int
             print(f"  ✓ Segment {seg['id']} translated to {lang}", file=sys.stderr)
 
     print(f"Done: {count} segment(s) translated to {lang}.", file=sys.stderr)
+
+    # Translate incident summary if present and not yet translated
+    incident_summary = storage.get_context("incident_summary")
+    existing_trans = storage.get_context(f"incident_summary:{lang}")
+    if incident_summary and not existing_trans:
+        _translate_incident_summary(client, storage, lang, verbose=verbose)
+
     return count
+
+
+def _translate_incident_summary(
+    client: genai.Client, storage: Storage, lang: str, verbose: bool = False
+) -> None:
+    """Translate the incident summary and type."""
+    lang_name = _LANG_NAMES.get(lang, lang)
+    incident_type = storage.get_context("incident_type") or ""
+    incident_summary = storage.get_context("incident_summary") or ""
+
+    text = f"Incident type: {incident_type}\nSummary: {incident_summary}"
+
+    def _run() -> dict:
+        response = client.models.generate_content(
+            model=os.environ.get("IR_TRACKER_FLASH_MODEL", _FLASH_MODEL),
+            contents=(
+                f"Translate the following incident summary into {lang_name}.\n"
+                f"Keep technical terms (IP addresses, hostnames, CVE IDs) as-is.\n\n"
+                f"{text}"
+            ),
+            config=types.GenerateContentConfig(
+                system_instruction=f"Translate accurately into {lang_name}. Be concise.",
+                response_mime_type="application/json",
+                response_schema={
+                    "type": "object",
+                    "properties": {
+                        "incident_type": {"type": "string"},
+                        "summary": {"type": "string"},
+                    },
+                    "required": ["incident_type", "summary"],
+                },
+            ),
+        )
+        return json.loads(response.text)
+
+    result = _call_with_retry(_run, f"incident-summary-{lang}")
+    storage.set_context(f"incident_type:{lang}", result["incident_type"])
+    storage.set_context(f"incident_summary:{lang}", result["summary"])
+
+    if verbose:
+        print(f"  ✓ Incident summary translated to {lang}", file=sys.stderr)

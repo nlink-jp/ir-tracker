@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from datetime import datetime
 from pathlib import Path
 
@@ -25,8 +26,84 @@ def _ts_to_display(ts: str) -> str:
         return ts
 
 
+_MAX_BUCKETS = 200  # Target max buckets for readable chart
+
+
+def _auto_bucket_seconds(span_sec: float) -> tuple[int, str, str]:
+    """Choose bucket size and display formats based on time span.
+
+    Returns (bucket_seconds, time_format, label_format).
+    """
+    # (threshold_hours, bucket_minutes, time_fmt, label_fmt)
+    tiers = [
+        (6,    5,    "%H:%M",       "%Y-%m-%d %H:%M"),  # <6h  → 5min
+        (24,   15,   "%H:%M",       "%Y-%m-%d %H:%M"),  # <24h → 15min
+        (72,   30,   "%H:%M",       "%Y-%m-%d %H:%M"),  # <3d  → 30min
+        (168,  60,   "%m/%d %H:00", "%Y-%m-%d %H:00"),  # <7d  → 1h
+        (720,  360,  "%m/%d %H:00", "%Y-%m-%d %H:00"),  # <30d → 6h
+        (None, 1440, "%m/%d",       "%Y-%m-%d"),         # 30d+ → 1day
+    ]
+    span_hours = span_sec / 3600
+    for threshold, minutes, time_fmt, label_fmt in tiers:
+        if threshold is None or span_hours < threshold:
+            return minutes * 60, time_fmt, label_fmt
+    return 1440 * 60, "%m/%d", "%Y-%m-%d"
+
+
+def _build_density(storage: Storage) -> list[dict]:
+    """Build message density histogram with auto-scaled bucket size.
+
+    Returns list of {"time": str, "count": int, "label": str}
+    for chart rendering. Bucket size adapts to the time range.
+    """
+    messages = storage.get_all_messages()
+    if not messages:
+        return []
+
+    timestamps = sorted(float(m["ts"].split(".")[0]) for m in messages)
+    t_min = timestamps[0]
+    t_max = timestamps[-1]
+    span = t_max - t_min
+
+    bucket_sec, time_fmt, label_fmt = _auto_bucket_seconds(span)
+
+    # Align to bucket boundaries
+    start = math.floor(t_min / bucket_sec) * bucket_sec
+    end = math.ceil(t_max / bucket_sec) * bucket_sec + bucket_sec
+
+    # Count messages per bucket using sorted timestamps (O(N) scan)
+    buckets: list[dict] = []
+    ts_idx = 0
+    t = start
+    while t < end:
+        t_end = t + bucket_sec
+        count = 0
+        while ts_idx < len(timestamps) and timestamps[ts_idx] < t_end:
+            if timestamps[ts_idx] >= t:
+                count += 1
+            ts_idx += 1
+        dt = datetime.fromtimestamp(t)
+        buckets.append({
+            "time": dt.strftime(time_fmt),
+            "label": dt.strftime(label_fmt),
+            "count": count,
+        })
+        t = t_end
+
+    return buckets
+
+
 def create_app(db_path: str) -> FastAPI:
     app = FastAPI(title="ir-tracker", docs_url=None, redoc_url=None)
+
+    @app.middleware("http")
+    async def security_headers(request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'"
+        return response
+
     app.mount("/static", StaticFiles(directory=str(_HERE / "static")), name="static")
 
     def _storage() -> Storage:
@@ -85,12 +162,29 @@ def create_app(db_path: str) -> FastAPI:
                 current_status = latest.get("status", "")
                 current_severity = latest.get("severity", "")
 
-            # Cumulative summary
-            cumulative = _build_cumulative(storage)
+            # Cumulative summary (with translation overlay)
+            cumulative = _build_cumulative(storage, lang=lang)
+
+            # Message density for activity chart
+            density = _build_density(storage)
+
+            # Incident summary
+            incident_type = storage.get_context("incident_type") or ""
+            incident_summary = storage.get_context("incident_summary") or ""
+            if lang:
+                translated = storage.get_context(f"incident_summary:{lang}")
+                if translated:
+                    incident_summary = translated
+                translated_type = storage.get_context(f"incident_type:{lang}")
+                if translated_type:
+                    incident_type = translated_type
 
             return _TEMPLATES.TemplateResponse(request, "timeline.html", {
                 "segments": seg_data,
                 "lang": lang,
+                "density": density,
+                "incident_type": incident_type,
+                "incident_summary": incident_summary,
                 "stats": {
                     "messages": msg_count,
                     "segments": len(segments),
@@ -126,6 +220,34 @@ def create_app(db_path: str) -> FastAPI:
         finally:
             storage.close()
 
+    @app.get("/api/segments/{segment_id}/messages")
+    def api_segment_messages(segment_id: int):
+        storage = _storage()
+        try:
+            # Find the segment
+            segments = storage.get_segments()
+            seg = next((s for s in segments if s["id"] == segment_id), None)
+            if not seg:
+                return {"error": "Segment not found", "messages": []}
+
+            messages = storage.get_messages_in_range(seg["start_ts"], seg["end_ts"])
+            return {
+                "segment_id": segment_id,
+                "start": _ts_to_display(seg["start_ts"]),
+                "end": _ts_to_display(seg["end_ts"]),
+                "messages": [
+                    {
+                        "time": _ts_to_display(m["ts"]),
+                        "user": m["user_name"] or m["user_id"],
+                        "text": m["text"],
+                        "is_bot": bool(m["is_bot"]),
+                    }
+                    for m in messages
+                ],
+            }
+        finally:
+            storage.close()
+
     @app.get("/api/timeline")
     def api_timeline(lang: str = ""):
         from ir_tracker.timeline import build_json_timeline
@@ -135,10 +257,25 @@ def create_app(db_path: str) -> FastAPI:
         finally:
             storage.close()
 
+    @app.get("/api/situation.md")
+    def api_situation_md(lang: str = ""):
+        from fastapi.responses import Response
+        from ir_tracker.timeline import build_situation_markdown
+        storage = _storage()
+        try:
+            md = build_situation_markdown(storage, lang=lang)
+            return Response(
+                content=md,
+                media_type="text/markdown; charset=utf-8",
+                headers={"Content-Disposition": "attachment; filename=situation.md"},
+            )
+        finally:
+            storage.close()
+
     return app
 
 
-def _build_cumulative(storage: Storage) -> dict | None:
+def _build_cumulative(storage: Storage, lang: str = "") -> dict | None:
     analyses = storage.get_all_analyses()
     if not analyses:
         return None
@@ -149,6 +286,19 @@ def _build_cumulative(storage: Storage) -> dict | None:
 
     for a in analyses:
         data = json.loads(a["analysis_json"])
+
+        # Overlay translation if available
+        if lang:
+            trans_json = storage.get_translation(a["segment_id"], lang)
+            if trans_json:
+                trans = json.loads(trans_json)
+                if trans.get("key_findings"):
+                    data["key_findings"] = trans["key_findings"]
+                if trans.get("open_questions"):
+                    data["open_questions"] = trans["open_questions"]
+                if trans.get("participants"):
+                    data["active_participants"] = trans["participants"]
+
         findings.extend(data.get("key_findings", []))
         questions.extend(data.get("open_questions", []))
         for p in data.get("active_participants", []):

@@ -174,9 +174,11 @@ class Storage:
         self._db.commit()
 
     def clear_segments(self) -> None:
-        """Delete all segments and analyses (keep messages)."""
+        """Delete all segments, analyses, translations, and context (keep messages)."""
+        self._db.execute("DELETE FROM analysis_translations")
         self._db.execute("DELETE FROM analyses")
         self._db.execute("DELETE FROM segments")
+        self._db.execute("DELETE FROM timeline_context")
         self._db.commit()
 
     # ── Analyses ──

@@ -2,39 +2,40 @@
 {% block title %}Timeline — ir-tracker{% endblock %}
 {% block content %}
 
-{# ── Stats ── #}
-<div class="stats">
-  <div class="stat">
-    <div class="number">{{ stats.messages }}</div>
-    <div class="label">Messages</div>
+{# ── Stats (fixed, does not scroll) ── #}
+<div class="stats-bar">
+  <div class="stats">
+    <div class="stat">
+      <div class="number">{{ stats.messages }}</div>
+      <div class="label">Messages</div>
+    </div>
+    <div class="stat">
+      <div class="number">{{ stats.segments }}</div>
+      <div class="label">Segments</div>
+    </div>
+    <div class="stat">
+      <div class="number">{{ stats.analyzed }}</div>
+      <div class="label">Analyzed</div>
+    </div>
+    {% if stats.current_status %}
+    <div class="stat">
+      <div class="label">Status</div>
+      <div><span class="badge badge-status">{{ stats.current_status | upper }}</span></div>
+    </div>
+    {% endif %}
+    {% if stats.current_severity %}
+    <div class="stat">
+      <div class="label">Severity</div>
+      <div><span class="badge badge-{{ stats.current_severity }}">{{ stats.current_severity | upper }}</span></div>
+    </div>
+    {% endif %}
   </div>
-  <div class="stat">
-    <div class="number">{{ stats.segments }}</div>
-    <div class="label">Segments</div>
-  </div>
-  <div class="stat">
-    <div class="number">{{ stats.analyzed }}</div>
-    <div class="label">Analyzed</div>
-  </div>
-  {% if stats.current_status %}
-  <div class="stat">
-    <div class="label">Status</div>
-    <div><span class="badge badge-status">{{ stats.current_status | upper }}</span></div>
-  </div>
-  {% endif %}
-  {% if stats.current_severity %}
-  <div class="stat">
-    <div class="label">Severity</div>
-    <div><span class="badge badge-{{ stats.current_severity }}">{{ stats.current_severity | upper }}</span></div>
+  {% if stats.time_range %}
+  <div style="color: var(--text-secondary); font-size: 13px; margin-top: 8px;">
+    {{ stats.time_range.0 }} — {{ stats.time_range.1 }}
   </div>
   {% endif %}
 </div>
-
-{% if stats.time_range %}
-<div style="color: var(--text-secondary); font-size: 13px; margin-bottom: 24px;">
-  {{ stats.time_range.0 }} — {{ stats.time_range.1 }}
-</div>
-{% endif %}
 
 {% if not segments %}
 <div style="text-align: center; color: var(--text-secondary); padding: 60px 0;">
@@ -42,14 +43,33 @@
 </div>
 {% else %}
 
+{# ── Incident summary ── #}
+{% if incident_summary %}
+<div class="incident-summary">
+  {% if incident_type %}<div class="incident-type">{{ incident_type }}</div>{% endif %}
+  <div class="incident-text">{{ incident_summary }}</div>
+</div>
+{% endif %}
+
+{# ── Activity density chart ── #}
+{% if density %}
+<div class="density-chart">
+  <div class="density-canvas-wrap" id="density-wrap">
+    <canvas id="density-canvas"></canvas>
+    <div class="density-tooltip" id="density-tooltip"></div>
+  </div>
+</div>
+<script id="density-data" type="application/json">{{ density | tojson }}</script>
+{% endif %}
+
 {# ── Two-column layout ── #}
 <div class="layout">
 
-  {# ── Left: Timeline (newest first) ── #}
-  <div>
+  {# ── Left: Timeline (newest first, scrollable) ── #}
+  <div class="timeline-scroll">
     <div class="timeline">
       {% for seg in segments %}
-      <div class="segment {{ seg.state }}">
+      <div class="segment {{ seg.state }}" data-segment-id="{{ seg.id }}">
         <div class="segment-header">
           <span class="segment-time">{{ seg.start_display }} — {{ seg.end_display }}</span>
           <span class="segment-count">{{ seg.message_count }} msgs</span>
@@ -112,11 +132,14 @@
     </div>
   </div>
 
-  {# ── Right: Floating status panel ── #}
+  {# ── Right: Floating status panel (scrollable) ── #}
   {% if cumulative %}
-  <div>
+  <div class="panel-scroll">
     <div class="status-panel">
-      <h3>Current Situation</h3>
+      <div class="panel-header">
+        <h3>Current Situation</h3>
+        <a href="/api/situation.md{% if lang %}?lang={{ lang }}{% endif %}" class="dl-btn" title="Download as Markdown">&#8681; .md</a>
+      </div>
 
       {% if stats.current_status %}
       <div class="section">
@@ -166,5 +189,246 @@
 
 </div>
 {% endif %}
+
+{# ── Message modal ── #}
+<div class="modal-overlay" id="msg-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-title">Messages</h3>
+      <button class="modal-close" id="modal-close">&times;</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+(function() {
+  // ── Message modal ──
+  var modal = document.getElementById('msg-modal');
+  var modalTitle = document.getElementById('modal-title');
+  var modalBody = document.getElementById('modal-body');
+  var modalClose = document.getElementById('modal-close');
+
+  if (modal) {
+    // Click segment header to open
+    document.querySelectorAll('.segment[data-segment-id]').forEach(function(seg) {
+      var header = seg.querySelector('.segment-header');
+      if (header) {
+        header.style.cursor = 'pointer';
+        header.addEventListener('click', function() {
+          var id = seg.dataset.segmentId;
+          modalBody.textContent = '';
+          var loading = document.createElement('div');
+          loading.style.cssText = 'text-align:center;color:var(--text-secondary);padding:20px;';
+          loading.textContent = 'Loading...';
+          modalBody.appendChild(loading);
+          modal.classList.add('active');
+
+          fetch('/api/segments/' + id + '/messages')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+              modalTitle.textContent = data.start + ' \u2014 ' + data.end + ' (' + data.messages.length + ' msgs)';
+              modalBody.textContent = '';
+              if (!data.messages.length) {
+                var empty = document.createElement('div');
+                empty.style.color = 'var(--text-secondary)';
+                empty.textContent = 'No messages.';
+                modalBody.appendChild(empty);
+                return;
+              }
+              var list = document.createElement('div');
+              list.className = 'msg-list';
+              data.messages.forEach(function(m) {
+                var row = document.createElement('div');
+                row.className = m.is_bot ? 'msg msg-bot' : 'msg';
+                var timeEl = document.createElement('span');
+                timeEl.className = 'msg-time';
+                timeEl.textContent = m.time;
+                var userEl = document.createElement('span');
+                userEl.className = 'msg-user';
+                userEl.textContent = m.user;
+                var textEl = document.createElement('span');
+                textEl.className = 'msg-text';
+                textEl.textContent = m.text;
+                row.appendChild(timeEl);
+                row.appendChild(userEl);
+                row.appendChild(textEl);
+                list.appendChild(row);
+              });
+              modalBody.appendChild(list);
+            })
+            .catch(function() {
+              modalBody.textContent = '';
+              var err = document.createElement('div');
+              err.style.color = 'var(--danger)';
+              err.textContent = 'Failed to load messages.';
+              modalBody.appendChild(err);
+            });
+        });
+      }
+    });
+
+    modalClose.addEventListener('click', function() { modal.classList.remove('active'); });
+    modal.addEventListener('click', function(e) {
+      if (e.target === modal) modal.classList.remove('active');
+    });
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') modal.classList.remove('active');
+    });
+  }
+
+})();
+</script>
+
+<script>
+(function() {
+  var el = document.getElementById('density-data');
+  if (!el) return;
+  var data = JSON.parse(el.textContent);
+  if (!data.length) return;
+
+  var canvas = document.getElementById('density-canvas');
+  var tip = document.getElementById('density-tooltip');
+  var wrap = document.getElementById('density-wrap');
+  var dpr = window.devicePixelRatio || 1;
+
+  function getColor(v) {
+    return getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  }
+
+  function draw() {
+    var W = wrap.clientWidth;
+    var H = 80;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+
+    var ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    var ml = 36, mr = 12, mt = 4, mb = 20; // margins: left, right, top, bottom
+    var cw = W - ml - mr;
+    var ch = H - mt - mb;
+
+    var maxCount = Math.max.apply(null, data.map(function(d){ return d.count; }));
+    if (maxCount === 0) maxCount = 1;
+
+    var axisColor = getColor('--text-secondary');
+    var barColor = getColor('--accent');
+    var bgLine = getColor('--border');
+
+    // Y-axis grid lines + labels
+    ctx.font = '10px -apple-system, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    var yTicks = _niceTicks(0, maxCount, 4);
+    for (var i = 0; i < yTicks.length; i++) {
+      var yVal = yTicks[i];
+      var yPos = mt + ch - (yVal / maxCount) * ch;
+      // grid line
+      ctx.strokeStyle = bgLine;
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(ml, yPos);
+      ctx.lineTo(W - mr, yPos);
+      ctx.stroke();
+      // label
+      ctx.fillStyle = axisColor;
+      ctx.fillText(String(yVal), ml - 4, yPos);
+    }
+
+    // Bars
+    var barW = Math.max(cw / data.length - 1, 1);
+    var gap = cw / data.length;
+    ctx.fillStyle = barColor;
+    ctx.globalAlpha = 0.7;
+    for (var j = 0; j < data.length; j++) {
+      var h = (data[j].count / maxCount) * ch;
+      var bx = ml + j * gap;
+      var by = mt + ch - h;
+      ctx.fillRect(bx, by, Math.max(barW, 1.5), h);
+    }
+    ctx.globalAlpha = 1.0;
+
+    // X-axis line
+    ctx.strokeStyle = axisColor;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(ml, mt + ch);
+    ctx.lineTo(W - mr, mt + ch);
+    ctx.stroke();
+
+    // Y-axis line
+    ctx.beginPath();
+    ctx.moveTo(ml, mt);
+    ctx.lineTo(ml, mt + ch);
+    ctx.stroke();
+
+    // X-axis labels — space by pixel width to prevent overlap
+    ctx.fillStyle = axisColor;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    var sampleLabel = data[0].time;
+    var labelW = ctx.measureText(sampleLabel).width + 16;
+    var maxLabels = Math.max(2, Math.floor(cw / labelW));
+    var step = Math.max(1, Math.ceil(data.length / maxLabels));
+    for (var k = 0; k < data.length; k += step) {
+      var lx = ml + k * gap + barW / 2;
+      ctx.fillText(data[k].time, lx, mt + ch + 4);
+    }
+    // Always show last label if it won't overlap
+    var lastIdx = data.length - 1;
+    if (lastIdx % step !== 0) {
+      var llx = ml + lastIdx * gap + barW / 2;
+      var prevLabelX = ml + (lastIdx - (lastIdx % step)) * gap + barW / 2;
+      if (llx - prevLabelX > labelW) {
+        ctx.fillText(data[lastIdx].time, llx, mt + ch + 4);
+      }
+    }
+  }
+
+  // Nice tick calculation
+  function _niceTicks(lo, hi, count) {
+    if (hi <= 0) return [0];
+    var range = hi - lo;
+    var rough = range / count;
+    var mag = Math.pow(10, Math.floor(Math.log10(rough)));
+    var norm = rough / mag;
+    var step;
+    if (norm <= 1.5) step = 1 * mag;
+    else if (norm <= 3) step = 2 * mag;
+    else if (norm <= 7) step = 5 * mag;
+    else step = 10 * mag;
+    step = Math.max(1, step);
+    var ticks = [];
+    for (var v = 0; v <= hi; v += step) ticks.push(Math.round(v));
+    if (ticks[ticks.length - 1] < hi) ticks.push(Math.round(hi));
+    return ticks;
+  }
+
+  draw();
+  window.addEventListener('resize', draw);
+
+  // Tooltip
+  canvas.addEventListener('mousemove', function(e) {
+    var rect = canvas.getBoundingClientRect();
+    var x = e.clientX - rect.left;
+    var ml = 36, mr = 12;
+    var cw = rect.width - ml - mr;
+    var idx = Math.floor((x - ml) / cw * data.length);
+    if (idx >= 0 && idx < data.length) {
+      tip.textContent = data[idx].label + ' \u2014 ' + data[idx].count + ' msgs';
+      tip.style.left = x + 'px';
+      tip.style.display = 'block';
+    } else {
+      tip.style.display = 'none';
+    }
+  });
+  canvas.addEventListener('mouseleave', function() {
+    tip.style.display = 'none';
+  });
+})();
+</script>
 
 {% endblock %}

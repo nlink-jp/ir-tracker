@@ -1,0 +1,30 @@
+{
+  "channel_name": "incident-2026-0330",
+  "messages": [
+    {"ts": "1711771200.000100", "user": "U001", "user_name": "alice", "text": "Alert triggered: unusual SSH login from 203.0.113.42 to bastion host. Checking audit logs now."},
+    {"ts": "1711771320.000200", "user": "U002", "user_name": "bob", "text": "I see the same IP in our firewall logs. Multiple connection attempts in the last 30 minutes."},
+    {"ts": "1711771440.000300", "user": "U001", "user_name": "alice", "text": "Confirmed: the SSH session authenticated using a service account key. Checking if that key was rotated recently."},
+    {"ts": "1711771560.000400", "user": "U003", "user_name": "carol", "text": "I'm pulling the access logs for that service account from IAM. Give me a few minutes."},
+    {"ts": "1711771680.000500", "user": "U002", "user_name": "bob", "text": "Network team confirmed: the source IP 203.0.113.42 is not in our known IP ranges. This is external."},
+    {"ts": "1711771800.000600", "user": "U001", "user_name": "alice", "text": "Escalating to P1. We have an unauthorized external SSH session on the bastion host using a valid service account."},
+    {"ts": "1711771920.000700", "user": "U004", "user_name": "dave", "text": "Comms lead here. I'll draft the initial stakeholder notification. What's the current blast radius?"},
+    {"ts": "1711772040.000800", "user": "U001", "user_name": "alice", "text": "Blast radius: bastion host only so far. No lateral movement detected yet. Bob, can you check east-west traffic?"},
+    {"ts": "1711772160.000900", "user": "U002", "user_name": "bob", "text": "Checking internal traffic from bastion. Found outbound connections to 10.0.3.15 (db-prod-01) on port 5432. That's PostgreSQL."},
+    {"ts": "1711772280.001000", "user": "U001", "user_name": "alice", "text": "That's bad. Carol, can you check the DB audit log for db-prod-01? Look for any unusual queries or data exports."},
+    {"ts": "1711773600.001100", "user": "U003", "user_name": "carol", "text": "DB audit log shows: at 09:15 UTC a pg_dump was executed against the customers table. ~50MB export."},
+    {"ts": "1711773720.001200", "user": "U001", "user_name": "alice", "text": "Confirmed data exfiltration. Isolating bastion host now. Bob, block 203.0.113.42 at the firewall immediately."},
+    {"ts": "1711773840.001300", "user": "U002", "user_name": "bob", "text": "Firewall rule added. 203.0.113.42 is now blocked on all ingress. Also blocking the service account."},
+    {"ts": "1711773960.001400", "user": "U004", "user_name": "dave", "text": "Stakeholder notification sent. Legal team has been informed about potential customer data exposure."},
+    {"ts": "1711774080.001500", "user": "U003", "user_name": "carol", "text": "IAM logs show the service account key was created 3 days ago by an unknown principal. This looks like a compromised admin account."},
+    {"ts": "1711774200.001600", "user": "U001", "user_name": "alice", "text": "We need to check all admin accounts for unauthorized activity. Carol, expand the IAM audit to all admin roles."},
+    {"ts": "1711774320.001700", "user": "U002", "user_name": "bob", "text": "Bastion host isolated. No more active connections from the threat actor. Containment confirmed."},
+    {"ts": "1711774440.001800", "user": "U001", "user_name": "alice", "text": "Good. Status update: incident is contained. Bastion isolated, attacker IP blocked, compromised key revoked. Moving to investigation phase."},
+    {"ts": "1711776000.001900", "user": "U003", "user_name": "carol", "text": "Found it. Admin account 'svc-deploy' was compromised via a phishing email 5 days ago. The attacker used it to create the service account key."},
+    {"ts": "1711776120.002000", "user": "U001", "user_name": "alice", "text": "Good find. Reset svc-deploy credentials and audit all actions taken by that account in the last 7 days."},
+    {"ts": "1711776240.002100", "user": "U005", "user_name": "eve", "text": "Forensics team here. We've captured the bastion host memory dump and disk image for analysis."},
+    {"ts": "1711776360.002200", "user": "U004", "user_name": "dave", "text": "Legal confirms: we need to assess whether this triggers breach notification requirements. Customer data may have been exposed."},
+    {"ts": "1711776480.002300", "user": "U001", "user_name": "alice", "text": "Current assessment: 50MB of customer data from pg_dump. We need to determine exactly which records were exported. Carol, can you analyze the DB logs for the exact query?"},
+    {"ts": "1711776600.002400", "user": "U003", "user_name": "carol", "text": "The pg_dump covered the entire customers table: names, emails, phone numbers. No payment data (that's in a separate encrypted store)."},
+    {"ts": "1711776720.002500", "user": "U001", "user_name": "alice", "text": "Summary: PII exposed (names, emails, phones) but no financial data. Dave, work with Legal on breach notification timeline. Forensics continuing."}
+  ]
+}

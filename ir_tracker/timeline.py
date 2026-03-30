@@ -158,6 +158,113 @@ def build_markdown_timeline(storage: Storage, lang: str = "") -> str:
     return "\n".join(lines)
 
 
+def build_situation_markdown(storage: Storage, lang: str = "") -> str:
+    """Build a Markdown snapshot of the current situation."""
+    analyses = storage.get_all_analyses()
+    segments = storage.get_segments()
+    msg_count = storage.get_message_count()
+    time_range = storage.get_time_range()
+
+    if not analyses:
+        return "# Current Situation\n\nNo analyses available yet.\n"
+
+    lines = ["# Current Situation", ""]
+
+    # Generated timestamp
+    lines.append(f"*Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}*")
+    lines.append("")
+
+    # Incident summary
+    incident_type = storage.get_context("incident_type") or ""
+    incident_summary = storage.get_context("incident_summary") or ""
+    if lang:
+        incident_type = storage.get_context(f"incident_type:{lang}") or incident_type
+        incident_summary = storage.get_context(f"incident_summary:{lang}") or incident_summary
+    if incident_type or incident_summary:
+        if incident_type:
+            lines.append(f"## {incident_type}")
+            lines.append("")
+        if incident_summary:
+            lines.append(f"> {incident_summary}")
+            lines.append("")
+        lines.append("---")
+        lines.append("")
+
+    # Status & severity from latest analysis
+    latest = json.loads(analyses[-1]["analysis_json"])
+    if lang:
+        trans_json = storage.get_translation(analyses[-1]["segment_id"], lang)
+        if trans_json:
+            trans = json.loads(trans_json)
+            # Only overlay translatable fields below, status/severity stay English
+    status = latest.get("status", "unknown").upper()
+    severity = latest.get("severity", "unknown").upper()
+    lines.append(f"**Status**: {status}  |  **Severity**: {severity}")
+    lines.append(f"**Messages**: {msg_count}  |  **Segments**: {len(segments)}  |  "
+                 f"**Analyzed**: {sum(1 for s in segments if s['state'] == 'analyzed')}")
+    if time_range:
+        lines.append(f"**Time range**: {_ts_to_datetime(time_range[0])} — {_ts_to_datetime(time_range[1])}")
+    lines.append("")
+    lines.append("---")
+    lines.append("")
+
+    # Cumulative data with translation overlay
+    all_findings: list[str] = []
+    all_questions: list[str] = []
+    all_participants: dict[str, tuple[str, str]] = {}  # name -> (role, activity)
+
+    for a in analyses:
+        data = json.loads(a["analysis_json"])
+        if lang:
+            trans_json = storage.get_translation(a["segment_id"], lang)
+            if trans_json:
+                trans = json.loads(trans_json)
+                if trans.get("key_findings"):
+                    data["key_findings"] = trans["key_findings"]
+                if trans.get("open_questions"):
+                    data["open_questions"] = trans["open_questions"]
+                if trans.get("participants"):
+                    data["active_participants"] = trans["participants"]
+
+        all_findings.extend(data.get("key_findings", []))
+        all_questions.extend(data.get("open_questions", []))
+        for p in data.get("active_participants", []):
+            name = p.get("user_name", "?")
+            all_participants[name] = (
+                p.get("inferred_role", ""),
+                p.get("current_activity", ""),
+            )
+
+    # Participants
+    if all_participants:
+        lines.append(f"## Participants ({len(all_participants)})")
+        lines.append("")
+        lines.append("| Name | Role | Current Activity |")
+        lines.append("|------|------|------------------|")
+        for name, (role, activity) in sorted(all_participants.items()):
+            lines.append(f"| @{name} | {role} | {activity} |")
+        lines.append("")
+
+    # Findings
+    if all_findings:
+        lines.append(f"## Key Findings ({len(all_findings)})")
+        lines.append("")
+        for i, f in enumerate(all_findings, 1):
+            lines.append(f"{i}. {f}")
+        lines.append("")
+
+    # Open questions
+    unique_q = list(dict.fromkeys(all_questions))
+    if unique_q:
+        lines.append(f"## Open Questions ({len(unique_q)})")
+        lines.append("")
+        for q in unique_q:
+            lines.append(f"- {q}")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
 def build_json_timeline(storage: Storage, lang: str = "") -> dict:
     """Build a JSON timeline from all analyses."""
     analyses = storage.get_all_analyses()

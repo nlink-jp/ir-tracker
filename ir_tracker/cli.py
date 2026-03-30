@@ -33,6 +33,18 @@ def main() -> None:
     segments_p = subparsers.add_parser("segments", help="List segments and states")
     segments_p.add_argument("--db", default="tracker.db", help="SQLite database path")
 
+    # situation
+    situation_p = subparsers.add_parser("situation", help="Output current situation as Markdown")
+    situation_p.add_argument("--db", default="tracker.db", help="SQLite database path")
+    situation_p.add_argument("--lang", "-l", default="", help="Display in translated language (e.g. ja)")
+    situation_p.add_argument("-o", "--output", default="", help="Write to file instead of stdout")
+
+    # translate
+    translate_p = subparsers.add_parser("translate", help="Translate analyses to target language")
+    translate_p.add_argument("--db", default="tracker.db", help="SQLite database path")
+    translate_p.add_argument("--lang", "-l", required=True, help="Target language (e.g. ja)")
+    translate_p.add_argument("--verbose", "-v", action="store_true")
+
     # reset
     reset_p = subparsers.add_parser("reset", help="Clear analyses (keep messages)")
     reset_p.add_argument("--db", default="tracker.db", help="SQLite database path")
@@ -53,10 +65,14 @@ def main() -> None:
         _run_ingest(args)
     elif args.command == "analyze":
         _run_analyze(args)
+    elif args.command == "situation":
+        _run_situation(args)
     elif args.command == "status":
         _run_status(args)
     elif args.command == "segments":
         _run_segments(args)
+    elif args.command == "translate":
+        _run_translate(args)
     elif args.command == "reset":
         _run_reset(args)
     elif args.command == "serve":
@@ -86,10 +102,27 @@ def _run_analyze(args) -> None:
 
     storage = Storage(args.db)
     try:
-        count = analyze_pending(storage, verbose=args.verbose)
-        if args.lang and count > 0:
+        analyze_pending(storage, verbose=args.verbose)
+        if args.lang:
             from ir_tracker.translator import translate_pending
             translate_pending(storage, args.lang, verbose=args.verbose)
+    finally:
+        storage.close()
+
+
+def _run_situation(args) -> None:
+    from pathlib import Path
+    from ir_tracker.storage import Storage
+    from ir_tracker.timeline import build_situation_markdown
+
+    storage = Storage(args.db)
+    try:
+        md = build_situation_markdown(storage, lang=args.lang)
+        if args.output:
+            Path(args.output).write_text(md, encoding="utf-8")
+            print(f"Written to {args.output}", file=sys.stderr)
+        else:
+            print(md)
     finally:
         storage.close()
 
@@ -129,6 +162,17 @@ def _run_segments(args) -> None:
         storage.close()
 
 
+def _run_translate(args) -> None:
+    from ir_tracker.translator import translate_pending
+    from ir_tracker.storage import Storage
+
+    storage = Storage(args.db)
+    try:
+        translate_pending(storage, args.lang, verbose=args.verbose)
+    finally:
+        storage.close()
+
+
 def _run_reset(args) -> None:
     from ir_tracker.storage import Storage
 
@@ -144,6 +188,12 @@ def _run_serve(args) -> None:
     from ir_tracker.web import create_app
     import uvicorn
     app = create_app(args.db)
+    if args.host not in ("127.0.0.1", "localhost", "::1"):
+        print(
+            "WARNING: Binding to non-localhost address. "
+            "This application has no authentication — ensure network access is restricted.",
+            file=sys.stderr,
+        )
     print(f"Starting ir-tracker Web UI at http://{args.host}:{args.port}", file=sys.stderr)
     print(f"Database: {args.db}", file=sys.stderr)
     uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
