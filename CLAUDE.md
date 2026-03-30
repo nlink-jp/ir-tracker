@@ -20,6 +20,7 @@ ir_tracker/
   analyzer.py      — Gemini 2.5 Pro segment analysis + incident summary
   translator.py    — Gemini Flash translation with DB caching
   timeline.py      — Markdown/JSON timeline + situation Markdown export
+  export_html.py   — Self-contained static HTML report generator
   storage.py       — SQLite schema (messages, segments, analyses, translations, context)
   web.py           — FastAPI app (timeline, segments, API endpoints, security headers)
   templates/       — Jinja2 HTML (base, timeline, segments)
@@ -34,7 +35,7 @@ stail export JSON → ingest (dedup) → SQLite messages
                                    → analyzer (Gemini Pro, context chaining, nonce-tagged prompts)
                                    → incident summary (Gemini Pro, post-analysis)
                                    → translator (Gemini Flash, cached)
-                                   → Web UI / CLI output
+                                   → Web UI / CLI output / static HTML export
 ```
 
 ### Database Tables
@@ -89,6 +90,7 @@ All commands accept `--db <path>` (default: `tracker.db`).
 | `translate --lang ja [-v]` | Translate analyses only |
 | `status [--format json\|markdown] [--lang ja]` | Output timeline |
 | `situation [--lang ja] [-o file]` | Current situation as Markdown |
+| `export [--lang ja] [-o file.html]` | Self-contained static HTML report |
 | `segments` | List segments and states |
 | `serve [--port 8080] [--host 127.0.0.1]` | Start Web UI |
 | `reset` | Clear analyses (keep messages) |

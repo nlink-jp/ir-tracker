@@ -59,6 +59,7 @@ ir-tracker analyze [-v] [--lang ja]               # Analyze pending segments + t
 ir-tracker translate --lang ja [-v]               # Translate analyses only
 ir-tracker status [--format json|markdown] [--lang ja]  # Output timeline
 ir-tracker situation [--lang ja] [-o file.md]     # Current situation as Markdown
+ir-tracker export [--lang ja] [-o timeline.html]  # Static HTML report (no server needed)
 ir-tracker segments                               # List segments and states
 ir-tracker serve [--port 8080] [--host 127.0.0.1] # Start Web UI
 ir-tracker reset                                  # Clear analyses (keep messages)
@@ -77,6 +78,17 @@ All commands accept `--db <path>` to specify the SQLite database (default: `trac
 | API: Messages | `/api/segments/{id}/messages` | Segment messages (JSON) |
 
 All pages support `?lang=ja` for translation overlay.
+
+## Static HTML Export
+
+Generate a self-contained HTML file that works without a server — ideal for sharing via email or file share:
+
+```bash
+ir-tracker export -o timeline.html                  # English
+ir-tracker export --lang ja -o timeline-ja.html     # Japanese
+```
+
+Both files include language toggle links. Place them in the same directory for seamless switching.
 
 ## Configuration
 
@@ -106,11 +118,12 @@ Authentication: `gcloud auth application-default login` or service account key.
 ir_tracker/
   cli.py           — CLI entry point (argparse subcommands)
   ingest.py        — Parse stail/scat export, dedup by ts
-  segmenter.py     — Time-window + gap detection segmentation
+  segmenter.py     — Time-window + gap detection + entropy-based splitting
   analyzer.py      — Gemini 2.5 Pro segment analysis + incident summary
-  translator.py    — Gemini Flash translation with caching
+  translator.py    — Gemini Flash parallel translation with caching
   timeline.py      — Markdown/JSON timeline + situation export
-  storage.py       — SQLite schema (messages, segments, analyses, translations, context)
+  export_html.py   — Self-contained static HTML report generator
+  storage.py       — SQLite schema with migration support
   web.py           — FastAPI app (timeline, segments, API endpoints)
   templates/       — Jinja2 HTML (base, timeline, segments)
   static/          — CSS (light/dark themes)

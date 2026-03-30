@@ -39,6 +39,12 @@ def main() -> None:
     situation_p.add_argument("--lang", "-l", default="", help="Display in translated language (e.g. ja)")
     situation_p.add_argument("-o", "--output", default="", help="Write to file instead of stdout")
 
+    # export
+    export_p = subparsers.add_parser("export", help="Generate self-contained static HTML report")
+    export_p.add_argument("--db", default="tracker.db", help="SQLite database path")
+    export_p.add_argument("--lang", "-l", default="", help="Display in translated language (e.g. ja)")
+    export_p.add_argument("-o", "--output", default="timeline.html", help="Output file path (default: timeline.html)")
+
     # translate
     translate_p = subparsers.add_parser("translate", help="Translate analyses to target language")
     translate_p.add_argument("--db", default="tracker.db", help="SQLite database path")
@@ -71,6 +77,8 @@ def main() -> None:
         _run_status(args)
     elif args.command == "segments":
         _run_segments(args)
+    elif args.command == "export":
+        _run_export(args)
     elif args.command == "translate":
         _run_translate(args)
     elif args.command == "reset":
@@ -123,6 +131,20 @@ def _run_situation(args) -> None:
             print(f"Written to {args.output}", file=sys.stderr)
         else:
             print(md)
+    finally:
+        storage.close()
+
+
+def _run_export(args) -> None:
+    from pathlib import Path
+    from ir_tracker.storage import Storage
+    from ir_tracker.export_html import export_html
+
+    storage = Storage(args.db)
+    try:
+        html = export_html(storage, lang=args.lang, output_path=args.output)
+        Path(args.output).write_text(html, encoding="utf-8")
+        print(f"Exported to {args.output}", file=sys.stderr)
     finally:
         storage.close()
 

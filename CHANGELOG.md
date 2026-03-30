@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.0] - 2026-03-31
+
+### Added
+- `export` command — generate self-contained static HTML report (no server needed)
+- All CSS, JS, density chart, message data inlined in a single HTML file
+- Language toggle via sibling files (`timeline.html` / `timeline-ja.html`)
+- Opens directly from `file://` — ideal for sharing via email or file share
+
 ## [0.2.3] - 2026-03-31
 
 ### Added
