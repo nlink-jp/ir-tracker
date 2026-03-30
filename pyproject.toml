@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ir-tracker"
-version = "0.1.2"
+version = "0.1.3"
 description = "Live incident response tracker — continuous ingestion, segmented analysis, and timeline visualization"
 requires-python = ">=3.11"
 dependencies = [

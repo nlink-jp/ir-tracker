@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.3] - 2026-03-31
+
+### Changed
+- Parallelize segment translations using ThreadPoolExecutor (default 4 workers)
+- DB writes serialized on main thread for SQLite safety
+
 ## [0.1.2] - 2026-03-31
 
 ### Fixed

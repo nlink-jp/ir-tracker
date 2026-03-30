@@ -104,28 +104,60 @@ def translate_analysis(
     return _call_with_retry(_run, f"translate-{lang}")
 
 
-def translate_pending(storage: Storage, lang: str, verbose: bool = False) -> int:
-    """Translate all analyzed but untranslated segments. Returns count translated."""
+_DEFAULT_WORKERS = 4
+
+
+def translate_pending(
+    storage: Storage, lang: str, verbose: bool = False, max_workers: int = _DEFAULT_WORKERS,
+) -> int:
+    """Translate all analyzed but untranslated segments. Returns count translated.
+
+    Segment translations run in parallel (up to max_workers) since each is
+    independent. DB writes are serialized on the main thread after collection.
+    """
     untranslated = storage.get_untranslated_segments(lang)
     if not untranslated:
         print(f"No segments to translate to {lang}.", file=sys.stderr)
         return 0
 
     client = _make_client()
-    print(f"Translating {len(untranslated)} segment(s) to {lang}...", file=sys.stderr)
 
-    count = 0
+    # Collect (segment_id, analysis_json) pairs to translate
+    tasks: list[tuple[int, str]] = []
     for seg in untranslated:
         analysis = storage.get_analysis(seg["id"])
-        if not analysis:
-            continue
+        if analysis:
+            tasks.append((seg["id"], analysis["analysis_json"]))
 
-        result = translate_analysis(client, analysis["analysis_json"], lang)
-        storage.save_translation(seg["id"], lang, result.model_dump_json())
+    if not tasks:
+        return 0
+
+    workers = min(max_workers, len(tasks))
+    print(f"Translating {len(tasks)} segment(s) to {lang} ({workers} workers)...", file=sys.stderr)
+
+    def _translate_one(item: tuple[int, str]) -> tuple[int, str]:
+        seg_id, analysis_json = item
+        result = translate_analysis(client, analysis_json, lang)
+        return seg_id, result.model_dump_json()
+
+    if workers <= 1:
+        # Sequential fallback
+        results = [_translate_one(t) for t in tasks]
+    else:
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        results = []
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {pool.submit(_translate_one, t): t[0] for t in tasks}
+            for future in as_completed(futures):
+                results.append(future.result())
+
+    # Write results to DB (main thread, serialized)
+    count = 0
+    for seg_id, translation_json in results:
+        storage.save_translation(seg_id, lang, translation_json)
         count += 1
-
         if verbose:
-            print(f"  ✓ Segment {seg['id']} translated to {lang}", file=sys.stderr)
+            print(f"  ✓ Segment {seg_id} translated to {lang}", file=sys.stderr)
 
     print(f"Done: {count} segment(s) translated to {lang}.", file=sys.stderr)
 
