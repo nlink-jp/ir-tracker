@@ -141,8 +141,12 @@ def _run_reset(args) -> None:
 
 
 def _run_serve(args) -> None:
-    print("Web UI not yet implemented.", file=sys.stderr)
-    sys.exit(1)
+    from ir_tracker.web import create_app
+    import uvicorn
+    app = create_app(args.db)
+    print(f"Starting ir-tracker Web UI at http://{args.host}:{args.port}", file=sys.stderr)
+    print(f"Database: {args.db}", file=sys.stderr)
+    uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
 
 
 if __name__ == "__main__":

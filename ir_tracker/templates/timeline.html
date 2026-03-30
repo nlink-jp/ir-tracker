@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% block title %}Timeline — ir-tracker{% endblock %}
+{% block content %}
+
+{# ── Stats ── #}
+<div class="stats">
+  <div class="stat">
+    <div class="number">{{ stats.messages }}</div>
+    <div class="label">Messages</div>
+  </div>
+  <div class="stat">
+    <div class="number">{{ stats.segments }}</div>
+    <div class="label">Segments</div>
+  </div>
+  <div class="stat">
+    <div class="number">{{ stats.analyzed }}</div>
+    <div class="label">Analyzed</div>
+  </div>
+  {% if stats.current_status %}
+  <div class="stat">
+    <div class="label">Status</div>
+    <div><span class="badge badge-status">{{ stats.current_status }}</span></div>
+  </div>
+  {% endif %}
+  {% if stats.current_severity %}
+  <div class="stat">
+    <div class="label">Severity</div>
+    <div><span class="badge badge-{{ stats.current_severity }}">{{ stats.current_severity | upper }}</span></div>
+  </div>
+  {% endif %}
+</div>
+
+{% if stats.time_range %}
+<div style="color: var(--text-secondary); font-size: 13px; margin-bottom: 24px;">
+  {{ stats.time_range.0 }} — {{ stats.time_range.1 }}
+</div>
+{% endif %}
+
+{# ── Timeline ── #}
+{% if segments %}
+<div class="timeline">
+  {% for seg in segments %}
+  <div class="segment {{ seg.state }}">
+    <div class="segment-header">
+      <span class="segment-time">{{ seg.start_display }} — {{ seg.end_display }}</span>
+      <span class="segment-count">{{ seg.message_count }} msgs</span>
+      {% if seg.state == 'analyzed' %}
+        <span class="badge badge-low">Analyzed</span>
+      {% elif seg.state == 'pending' %}
+        <span class="badge" style="background: var(--warning); color: white;">Pending</span>
+      {% elif seg.state == 'stale' %}
+        <span class="badge" style="background: var(--info); color: white;">Stale</span>
+      {% endif %}
+    </div>
+
+    {% if seg.analysis %}
+    <div class="segment-card">
+      <div class="segment-summary">{{ seg.analysis.summary }}</div>
+
+      {% if seg.analysis.key_findings %}
+      <div class="section-title">Key Findings</div>
+      <ul class="finding-list">
+        {% for f in seg.analysis.key_findings %}
+        <li>{{ f }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+
+      {% if seg.analysis.active_participants %}
+      <div class="section-title">Participants</div>
+      {% for p in seg.analysis.active_participants %}
+      <div class="participant">
+        <span class="participant-name">@{{ p.user_name }}</span>
+        <span class="participant-role">({{ p.inferred_role }})</span>
+        <span class="participant-activity">{{ p.current_activity }}</span>
+      </div>
+      {% endfor %}
+      {% endif %}
+
+      {% if seg.analysis.notable_events %}
+      <div class="section-title">Events</div>
+      {% for e in seg.analysis.notable_events %}
+      <div class="event">
+        <span class="event-time">{{ e.time }}</span>
+        {% if e.significance == 'high' %}
+          <span class="event-sig">🔴</span>
+        {% elif e.significance == 'medium' %}
+          <span class="event-sig">🟡</span>
+        {% else %}
+          <span class="event-sig">⚪</span>
+        {% endif %}
+        <span>{{ e.description }}</span>
+      </div>
+      {% endfor %}
+      {% endif %}
+
+      {% if seg.analysis.open_questions %}
+      <div class="section-title">Open Questions</div>
+      <ul class="question-list">
+        {% for q in seg.analysis.open_questions %}
+        <li>{{ q }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </div>
+    {% else %}
+    <div class="segment-card" style="color: var(--text-secondary); font-style: italic;">
+      Analysis pending — run <code>ir-tracker analyze</code>
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div style="text-align: center; color: var(--text-secondary); padding: 60px 0;">
+  No data yet. Run <code>ir-tracker ingest &lt;export.json&gt;</code> to start.
+</div>
+{% endif %}
+
+{# ── Cumulative Summary ── #}
+{% if cumulative %}
+<div class="summary-panel">
+  <h2>Cumulative Summary</h2>
+
+  {% if cumulative.findings %}
+  <div class="section-title">{{ cumulative.findings | length }} Key Finding(s)</div>
+  <ul class="finding-list">
+    {% for f in cumulative.findings %}
+    <li>{{ f }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  {% if cumulative.participants %}
+  <div class="section-title">{{ cumulative.participants | length }} Participant(s)</div>
+  {% for user, activity in cumulative.participants.items() %}
+  <div class="participant">
+    <span class="participant-name">@{{ user }}</span>
+    <span class="participant-activity">{{ activity }}</span>
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  {% if cumulative.questions %}
+  <div class="section-title">{{ cumulative.questions | length }} Open Question(s)</div>
+  <ul class="question-list">
+    {% for q in cumulative.questions %}
+    <li>{{ q }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}

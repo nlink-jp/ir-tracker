@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}ir-tracker{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script>
+    (function() { var t = localStorage.getItem('theme'); if (t) document.documentElement.setAttribute('data-theme', t); })();
+  </script>
+</head>
+<body>
+  <nav>
+    <div class="container">
+      <span class="logo">ir-tracker</span>
+      <a href="/" class="nav-link">Timeline</a>
+      <a href="/segments" class="nav-link">Segments</a>
+      <a href="/api/timeline" class="nav-link">API</a>
+      <div class="lang-toggle">
+        <a href="?lang=" class="lang-btn {{ 'active' if not lang }}">EN</a>
+        <a href="?lang=ja" class="lang-btn {{ 'active' if lang == 'ja' }}">JA</a>
+      </div>
+      <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+        <span id="theme-icon">&#9790;</span>
+      </button>
+    </div>
+  </nav>
+  <div class="container">
+    {% block content %}{% endblock %}
+  </div>
+  <script>
+    function toggleTheme() {
+      var el = document.documentElement;
+      var c = el.getAttribute('data-theme');
+      var n = c === 'dark' ? 'light' : 'dark';
+      if (!c) n = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'light' : 'dark';
+      el.setAttribute('data-theme', n);
+      localStorage.setItem('theme', n);
+      updateIcon(n);
+    }
+    function updateIcon(t) {
+      var i = document.getElementById('theme-icon');
+      if (i) i.textContent = t === 'dark' ? '\u263E' : '\u2600';
+    }
+    (function() {
+      var t = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      updateIcon(t);
+    })();
+  </script>
+</body>
+</html>

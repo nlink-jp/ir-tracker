@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Segments — ir-tracker{% endblock %}
+{% block content %}
+<h1 style="margin-bottom: 20px;">Segments</h1>
+
+{% if segments %}
+<table style="width: 100%; border-collapse: collapse;">
+  <thead>
+    <tr style="border-bottom: 2px solid var(--border);">
+      <th style="padding: 8px; text-align: left; color: var(--text-secondary); font-size: 12px;">ID</th>
+      <th style="padding: 8px; text-align: left; color: var(--text-secondary); font-size: 12px;">STATE</th>
+      <th style="padding: 8px; text-align: right; color: var(--text-secondary); font-size: 12px;">MSGS</th>
+      <th style="padding: 8px; text-align: left; color: var(--text-secondary); font-size: 12px;">START</th>
+      <th style="padding: 8px; text-align: left; color: var(--text-secondary); font-size: 12px;">END</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for seg in segments %}
+    <tr style="border-bottom: 1px solid var(--border);">
+      <td style="padding: 8px; font-weight: 600;">{{ seg.id }}</td>
+      <td style="padding: 8px;">
+        {% if seg.state == 'analyzed' %}
+          <span class="badge badge-low">Analyzed</span>
+        {% elif seg.state == 'pending' %}
+          <span class="badge" style="background: var(--warning); color: white;">Pending</span>
+        {% elif seg.state == 'stale' %}
+          <span class="badge" style="background: var(--info); color: white;">Stale</span>
+        {% endif %}
+      </td>
+      <td style="padding: 8px; text-align: right;">{{ seg.message_count }}</td>
+      <td style="padding: 8px; font-size: 14px;">{{ seg.start_display }}</td>
+      <td style="padding: 8px; font-size: 14px;">{{ seg.end_display }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div style="text-align: center; color: var(--text-secondary); padding: 60px 0;">
+  No segments yet.
+</div>
+{% endif %}
+{% endblock %}
