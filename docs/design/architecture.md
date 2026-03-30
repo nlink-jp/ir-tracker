@@ -65,11 +65,18 @@ This can be run manually, on a cron, or triggered by a wrapper script.
 
 ### 1. Ingest Layer
 
-**Input:** stail/scat export JSON (same format ai-ir uses)
+**Input:** Slack conversation export JSON (stail, scat, or scli format)
+
+Note: stail/scat and scli use different field names for the same data.
+The ingest layer normalizes both transparently:
+- Timestamp: `ts` (stail/scat) or `timestamp_unix` (scli)
+- User ID: `user` (stail/scat) or `user_id` (scli)
+- Bot detection: `bot_id`/`subtype` (stail/scat) or `post_type` (scli)
+- Thread: `thread_ts` (stail/scat) or `thread_timestamp_unix` (scli)
 
 **Responsibilities:**
 - Parse export JSON and extract messages
-- Deduplicate by message timestamp (`ts` field — unique per message in Slack)
+- Deduplicate by message timestamp (`ts`/`timestamp_unix` — unique per message in Slack)
 - Sort chronologically
 - Handle repeated ingestion of overlapping data gracefully
 - Track ingestion metadata (when each message was first seen)
