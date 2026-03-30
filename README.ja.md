@@ -54,15 +54,17 @@ ir-tracker serve
 ## CLI
 
 ```bash
-ir-tracker ingest <export.json>          # メッセージ取り込み（重複排除・自動セグメント化）
-ir-tracker analyze [-v] [--lang ja]      # 未分析セグメントを分析 + 翻訳
-ir-tracker translate --lang ja           # 翻訳のみ実行
+ir-tracker ingest <export.json> [--channel name]  # メッセージ取り込み（重複排除・自動セグメント化）
+ir-tracker analyze [-v] [--lang ja]               # 未分析セグメントを分析 + 翻訳
+ir-tracker translate --lang ja [-v]               # 翻訳のみ実行
 ir-tracker status [--format json|markdown] [--lang ja]  # タイムライン出力
-ir-tracker situation [--lang ja] [-o file.md]  # 現在の状況を Markdown 出力
-ir-tracker segments                      # セグメント一覧と状態
-ir-tracker serve [--port 8080]           # Web UI 起動
-ir-tracker reset                         # 分析をクリア（メッセージは保持）
+ir-tracker situation [--lang ja] [-o file.md]     # 現在の状況を Markdown 出力
+ir-tracker segments                               # セグメント一覧と状態
+ir-tracker serve [--port 8080] [--host 127.0.0.1] # Web UI 起動
+ir-tracker reset                                  # 分析をクリア（メッセージは保持）
 ```
+
+全コマンド共通で `--db <path>` により SQLite データベースパスを指定可能（デフォルト: `tracker.db`）。
 
 ## Web UI
 

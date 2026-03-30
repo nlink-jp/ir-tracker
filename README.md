@@ -54,15 +54,17 @@ ir-tracker serve
 ## CLI
 
 ```bash
-ir-tracker ingest <export.json>          # Import messages (dedup, auto-segment)
-ir-tracker analyze [-v] [--lang ja]      # Analyze pending segments + translate
-ir-tracker translate --lang ja           # Translate analyses only
+ir-tracker ingest <export.json> [--channel name]  # Import messages (dedup, auto-segment)
+ir-tracker analyze [-v] [--lang ja]               # Analyze pending segments + translate
+ir-tracker translate --lang ja [-v]               # Translate analyses only
 ir-tracker status [--format json|markdown] [--lang ja]  # Output timeline
-ir-tracker situation [--lang ja] [-o file.md]  # Current situation as Markdown
-ir-tracker segments                      # List segments and states
-ir-tracker serve [--port 8080]           # Start Web UI
-ir-tracker reset                         # Clear analyses (keep messages)
+ir-tracker situation [--lang ja] [-o file.md]     # Current situation as Markdown
+ir-tracker segments                               # List segments and states
+ir-tracker serve [--port 8080] [--host 127.0.0.1] # Start Web UI
+ir-tracker reset                                  # Clear analyses (keep messages)
 ```
+
+All commands accept `--db <path>` to specify the SQLite database (default: `tracker.db`).
 
 ## Web UI
 

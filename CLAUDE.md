@@ -80,15 +80,17 @@ Authentication: `gcloud auth application-default login` or service account.
 
 ## CLI Commands
 
+All commands accept `--db <path>` (default: `tracker.db`).
+
 | Command | Description |
 |---------|-------------|
-| `ingest <file>` | Import messages, dedup, auto-segment |
+| `ingest <file> [--channel name]` | Import messages, dedup, auto-segment |
 | `analyze [-v] [--lang ja]` | Analyze pending segments + translate |
-| `translate --lang ja` | Translate analyses only |
-| `status [--format json]` | Output timeline |
+| `translate --lang ja [-v]` | Translate analyses only |
+| `status [--format json\|markdown] [--lang ja]` | Output timeline |
 | `situation [--lang ja] [-o file]` | Current situation as Markdown |
 | `segments` | List segments and states |
-| `serve [--port 8080]` | Start Web UI |
+| `serve [--port 8080] [--host 127.0.0.1]` | Start Web UI |
 | `reset` | Clear analyses (keep messages) |
 
 ## Web UI Endpoints
