@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2] - 2026-03-31
+
+### Fixed
+- Correct docs: stail/scat/scli all share the same export schema (`timestamp_unix`, `user_id`, `post_type`)
+- Sample fixture updated from raw Slack API format to actual stail/scli format
+- Document `--db`, `--channel`, `--host` flags in CLI reference (README, README.ja, CLAUDE.md)
+
 ## [0.1.1] - 2026-03-31
 
 ### Fixed
