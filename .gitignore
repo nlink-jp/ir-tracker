@@ -1,0 +1,17 @@
+dist/
+build/
+*.egg-info/
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.venv/
+*.db
+data/
+.env
+.env.*
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo

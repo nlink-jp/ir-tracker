@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=75.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ir-tracker"
+version = "0.1.0"
+description = "Live incident response tracker — continuous ingestion, segmented analysis, and timeline visualization"
+requires-python = ">=3.11"
+dependencies = [
+    "google-genai>=1.67.0",
+    "pydantic>=2.12.0",
+    "fastapi>=0.115.0",
+    "uvicorn>=0.34.0",
+    "jinja2>=3.1.0",
+]
+
+[project.scripts]
+ir-tracker = "ir_tracker.cli:main"
+
+[project.urls]
+Repository = "https://github.com/nlink-jp/ir-tracker"
+
+[tool.setuptools.packages.find]
+include = ["ir_tracker*"]
+
+[tool.setuptools.package-data]
+ir_tracker = ["templates/*.html", "static/*.css"]
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.408",
+    "pytest>=8.0.0",
+]
