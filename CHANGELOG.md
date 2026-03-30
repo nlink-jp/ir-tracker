@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.2.1] - 2026-03-31
+
+### Added
+- Record token usage from Vertex AI `usage_metadata` (prompt + candidates)
+- Mock tests for analyzer (6 tests) and translator (4 tests) — 30 tests total
+- Storage docstring documenting thread safety design
+
+### Changed
+- Move function-scoped imports to module level in `web.py`
+
 ## [0.2.0] - 2026-03-31
 
 ### Added

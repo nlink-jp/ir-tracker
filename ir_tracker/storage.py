@@ -55,7 +55,12 @@ CREATE TABLE IF NOT EXISTS analysis_translations (
 
 
 class Storage:
-    """SQLite storage for ir-tracker."""
+    """SQLite storage for ir-tracker.
+
+    Each Storage instance owns its own SQLite connection and must not be
+    shared across threads. The translator's parallel workers create their
+    own results in-thread and write to the DB on the main thread only.
+    """
 
     def __init__(self, db_path: str) -> None:
         self._db = sqlite3.connect(db_path)

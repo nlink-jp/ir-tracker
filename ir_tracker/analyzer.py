@@ -251,7 +251,10 @@ def analyze_segment(storage: Storage, segment: dict, verbose: bool = False) -> S
 
     system_prompt = _SYSTEM_PROMPT_TEMPLATE.format(tz_name=tz_name, tz_offset=tz_offset, nonce=nonce)
 
+    token_count = 0
+
     def _run() -> SegmentAnalysis:
+        nonlocal token_count
         response = client.models.generate_content(
             model=model,
             contents=user_prompt,
@@ -261,6 +264,11 @@ def analyze_segment(storage: Storage, segment: dict, verbose: bool = False) -> S
                 response_schema=SegmentAnalysis,
             ),
         )
+        if response.usage_metadata:
+            token_count = (
+                (response.usage_metadata.prompt_token_count or 0)
+                + (response.usage_metadata.candidates_token_count or 0)
+            )
         data = json.loads(response.text)
         return SegmentAnalysis(**data)
 
@@ -271,7 +279,7 @@ def analyze_segment(storage: Storage, segment: dict, verbose: bool = False) -> S
         segment_id=segment["id"],
         analysis_json=result.model_dump_json(),
         model=model,
-        token_count=0,  # TODO: extract from response metadata if available
+        token_count=token_count,
     )
     storage.mark_segment_analyzed(segment["id"])
 

@@ -8,11 +8,12 @@ from datetime import datetime
 from pathlib import Path
 
 from fastapi import FastAPI, Query, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from ir_tracker.storage import Storage
+from ir_tracker.timeline import build_json_timeline, build_situation_markdown
 
 _HERE = Path(__file__).parent
 _TEMPLATES = Jinja2Templates(directory=str(_HERE / "templates"))
@@ -250,7 +251,6 @@ def create_app(db_path: str) -> FastAPI:
 
     @app.get("/api/timeline")
     def api_timeline(lang: str = ""):
-        from ir_tracker.timeline import build_json_timeline
         storage = _storage()
         try:
             return build_json_timeline(storage, lang=lang)
@@ -259,8 +259,6 @@ def create_app(db_path: str) -> FastAPI:
 
     @app.get("/api/situation.md")
     def api_situation_md(lang: str = ""):
-        from fastapi.responses import Response
-        from ir_tracker.timeline import build_situation_markdown
         storage = _storage()
         try:
             md = build_situation_markdown(storage, lang=lang)
