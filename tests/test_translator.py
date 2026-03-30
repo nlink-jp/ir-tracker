@@ -51,6 +51,9 @@ def test_translate_pending_parallel(mock_client):
             open_questions=["翻訳された質問"],
         )
         resp.text = trans.model_dump_json()
+        resp.usage_metadata = MagicMock()
+        resp.usage_metadata.prompt_token_count = 100
+        resp.usage_metadata.candidates_token_count = 30
         return resp
 
     mock_client.return_value.models.generate_content.side_effect = _fake_generate
@@ -82,6 +85,9 @@ def test_translate_pending_sequential(mock_client):
             open_questions=["Translated question"],
         )
         resp.text = trans.model_dump_json()
+        resp.usage_metadata = MagicMock()
+        resp.usage_metadata.prompt_token_count = 80
+        resp.usage_metadata.candidates_token_count = 20
         return resp
 
     mock_client.return_value.models.generate_content.side_effect = _fake_generate
@@ -116,8 +122,14 @@ def test_translate_analysis_mock():
     trans = TranslatedAnalysis(
         summary="要約", key_findings=["発見1"], open_questions=["質問1"],
     )
-    client.models.generate_content.return_value.text = trans.model_dump_json()
+    resp = MagicMock()
+    resp.text = trans.model_dump_json()
+    resp.usage_metadata = MagicMock()
+    resp.usage_metadata.prompt_token_count = 200
+    resp.usage_metadata.candidates_token_count = 50
+    client.models.generate_content.return_value = resp
 
-    result = translate_analysis(client, '{"summary":"test"}', "ja")
+    result, tokens = translate_analysis(client, '{"summary":"test"}', "ja")
     assert result.summary == "要約"
     assert result.key_findings == ["発見1"]
+    assert tokens == 250

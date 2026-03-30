@@ -31,14 +31,14 @@ def _split_dense_window(
     rate_change_factor: float,
     min_messages: int,
 ) -> list[list[str]]:
-    """Split a window at the point of maximum rate change.
+    """Recursively split a window at points of maximum rate change.
 
     Divides the window into two halves at each candidate split point and
     compares message rates. If the ratio exceeds rate_change_factor,
-    splits at the point with the highest ratio.
+    splits at the point with the highest ratio, then recursively checks
+    each sub-window for further splits.
 
     Only splits if both resulting halves have >= min_messages.
-    Returns a list of 1 or 2 sub-windows.
     """
     n = len(timestamps)
     if n < min_messages * 2:
@@ -69,7 +69,9 @@ def _split_dense_window(
                 best_split = i
 
     if best_ratio >= rate_change_factor and best_split > 0:
-        return [timestamps[:best_split], timestamps[best_split:]]
+        left = _split_dense_window(timestamps[:best_split], rate_change_factor, min_messages)
+        right = _split_dense_window(timestamps[best_split:], rate_change_factor, min_messages)
+        return left + right
 
     return [timestamps]
 

@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.2] - 2026-03-31
+
+### Added
+- Record translation token usage from `usage_metadata` in `analysis_translations` table
+- Schema migration support: `_migrate()` adds columns to existing databases non-destructively
+- Recursive dense window splitting: multiple rate spikes within a single window produce multiple segments
+- Test for recursive splitting (31 tests total)
+
+### Changed
+- `translate_analysis()` now returns `(TranslatedAnalysis, token_count)` tuple
+
 ## [0.2.1] - 2026-03-31
 
 ### Added

@@ -72,11 +72,16 @@ def _make_client() -> genai.Client:
 
 def translate_analysis(
     client: genai.Client, analysis_json: str, lang: str
-) -> TranslatedAnalysis:
-    """Translate an analysis JSON to the target language using Gemini Flash."""
+) -> tuple[TranslatedAnalysis, int]:
+    """Translate an analysis JSON to the target language using Gemini Flash.
+
+    Returns (translated_analysis, token_count).
+    """
     lang_name = _LANG_NAMES.get(lang, lang)
+    token_count = 0
 
     def _run() -> TranslatedAnalysis:
+        nonlocal token_count
         response = client.models.generate_content(
             model=_FLASH_MODEL,
             contents=(
@@ -98,10 +103,16 @@ def translate_analysis(
                 response_schema=TranslatedAnalysis,
             ),
         )
+        if response.usage_metadata:
+            token_count = (
+                (response.usage_metadata.prompt_token_count or 0)
+                + (response.usage_metadata.candidates_token_count or 0)
+            )
         data = json.loads(response.text)
         return TranslatedAnalysis(**data)
 
-    return _call_with_retry(_run, f"translate-{lang}")
+    result = _call_with_retry(_run, f"translate-{lang}")
+    return result, token_count
 
 
 _DEFAULT_WORKERS = 4
@@ -135,10 +146,10 @@ def translate_pending(
     workers = min(max_workers, len(tasks))
     print(f"Translating {len(tasks)} segment(s) to {lang} ({workers} workers)...", file=sys.stderr)
 
-    def _translate_one(item: tuple[int, str]) -> tuple[int, str]:
+    def _translate_one(item: tuple[int, str]) -> tuple[int, str, int]:
         seg_id, analysis_json = item
-        result = translate_analysis(client, analysis_json, lang)
-        return seg_id, result.model_dump_json()
+        result, tokens = translate_analysis(client, analysis_json, lang)
+        return seg_id, result.model_dump_json(), tokens
 
     if workers <= 1:
         # Sequential fallback
@@ -153,11 +164,11 @@ def translate_pending(
 
     # Write results to DB (main thread, serialized)
     count = 0
-    for seg_id, translation_json in results:
-        storage.save_translation(seg_id, lang, translation_json)
+    for seg_id, translation_json, tokens in results:
+        storage.save_translation(seg_id, lang, translation_json, token_count=tokens)
         count += 1
         if verbose:
-            print(f"  ✓ Segment {seg_id} translated to {lang}", file=sys.stderr)
+            print(f"  ✓ Segment {seg_id} translated to {lang} ({tokens} tokens)", file=sys.stderr)
 
     print(f"Done: {count} segment(s) translated to {lang}.", file=sys.stderr)
 

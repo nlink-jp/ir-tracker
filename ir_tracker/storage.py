@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS analysis_translations (
     lang        TEXT NOT NULL,
     translation_json TEXT NOT NULL,
     translated_at TEXT NOT NULL,
+    token_count INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (segment_id, lang),
     FOREIGN KEY (segment_id) REFERENCES segments(id)
 );
@@ -66,7 +67,15 @@ class Storage:
         self._db = sqlite3.connect(db_path)
         self._db.row_factory = sqlite3.Row
         self._db.executescript(_SCHEMA)
+        self._migrate()
         self._db.commit()
+
+    def _migrate(self) -> None:
+        """Apply incremental schema migrations for existing databases."""
+        # v0.2.2: add token_count to analysis_translations
+        cols = {row[1] for row in self._db.execute("PRAGMA table_info(analysis_translations)")}
+        if "token_count" not in cols:
+            self._db.execute("ALTER TABLE analysis_translations ADD COLUMN token_count INTEGER NOT NULL DEFAULT 0")
 
     def close(self) -> None:
         self._db.close()
@@ -214,11 +223,14 @@ class Storage:
 
     # ── Translations ──
 
-    def save_translation(self, segment_id: int, lang: str, translation_json: str) -> None:
+    def save_translation(
+        self, segment_id: int, lang: str, translation_json: str, token_count: int = 0,
+    ) -> None:
         self._db.execute(
-            "INSERT OR REPLACE INTO analysis_translations (segment_id, lang, translation_json, translated_at) "
-            "VALUES (?, ?, ?, ?)",
-            (segment_id, lang, translation_json, datetime.now().isoformat()),
+            "INSERT OR REPLACE INTO analysis_translations "
+            "(segment_id, lang, translation_json, translated_at, token_count) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (segment_id, lang, translation_json, datetime.now().isoformat(), token_count),
         )
         self._db.commit()
 

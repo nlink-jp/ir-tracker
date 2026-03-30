@@ -112,3 +112,28 @@ def test_no_split_when_rate_uniform():
     assert len(segs) == 1
     assert segs[0].message_count == 10
     s.close()
+
+
+def test_recursive_split():
+    """Multiple rate spikes within a single window should produce multiple splits."""
+    base = 1711234567
+    # Phase 1: slow — 4 msgs over 5 min (0.8 msg/min)
+    phase1 = [f"{base + i * 75}.000001" for i in range(4)]
+    # Phase 2: fast — 6 msgs over 30 sec (12 msg/min) — 15x spike
+    phase2_start = base + 360
+    phase2 = [f"{phase2_start + i * 5}.000001" for i in range(6)]
+    # Phase 3: slow — 4 msgs over 5 min (0.8 msg/min)
+    phase3_start = phase2_start + 360
+    phase3 = [f"{phase3_start + i * 75}.000001" for i in range(4)]
+    # Phase 4: fast — 6 msgs over 30 sec (12 msg/min) — 15x spike
+    phase4_start = phase3_start + 360
+    phase4 = [f"{phase4_start + i * 5}.000001" for i in range(6)]
+    timestamps = phase1 + phase2 + phase3 + phase4
+
+    s, _ = _make_storage_with_messages(timestamps)
+    segs = build_segments(s, window_minutes=60, rate_change_factor=3.0)
+    # Should split into more than 2 segments due to recursive splitting
+    assert len(segs) >= 3
+    total = sum(seg.message_count for seg in segs)
+    assert total == 20
+    s.close()
