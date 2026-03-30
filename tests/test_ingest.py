@@ -80,3 +80,52 @@ def test_ingest_incremental():
         s = Storage(db)
         assert s.get_message_count() == 3
         s.close()
+
+
+def test_ingest_scli_format():
+    """scli channel export uses timestamp_unix instead of ts."""
+    with tempfile.TemporaryDirectory() as tmp:
+        export_path = _write_export(tmp, {
+            "export_timestamp": "2026-03-30T12:00:00Z",
+            "channel_name": "#incident-2026",
+            "messages": [
+                {
+                    "user_id": "U001",
+                    "user_name": "alice",
+                    "post_type": "user",
+                    "timestamp": "2026-03-30T09:00:00Z",
+                    "timestamp_unix": "1743325200.000000",
+                    "text": "investigating alert",
+                    "files": [],
+                    "is_reply": False,
+                },
+                {
+                    "user_id": "U002",
+                    "user_name": "bob",
+                    "post_type": "bot",
+                    "timestamp": "2026-03-30T09:05:00Z",
+                    "timestamp_unix": "1743325500.000000",
+                    "text": "automated alert details",
+                    "files": [],
+                    "thread_timestamp_unix": "1743325200.000000",
+                    "is_reply": True,
+                },
+            ],
+        })
+        db = str(Path(tmp) / "test.db")
+        new, dup = ingest_export(db, export_path)
+        assert new == 2
+        assert dup == 0
+
+        s = Storage(db)
+        msgs = s.get_all_messages()
+        assert len(msgs) == 2
+        # Check field mapping
+        assert msgs[0]["user_id"] == "U001"
+        assert msgs[0]["user_name"] == "alice"
+        assert msgs[0]["ts"] == "1743325200.000000"
+        assert msgs[0]["is_bot"] == 0
+        # Bot detection via post_type
+        assert msgs[1]["is_bot"] == 1
+        assert msgs[1]["thread_ts"] == "1743325200.000000"
+        s.close()

@@ -36,15 +36,20 @@ def ingest_export(db_path: str, export_path: str, channel_override: str = "") ->
         dup_count = 0
 
         for msg in messages:
-            ts = msg.get("ts", "")
+            # Support both stail format (ts) and scli format (timestamp_unix)
+            ts = msg.get("ts") or msg.get("timestamp_unix", "")
             if not ts:
                 continue
 
-            user_id = msg.get("user", msg.get("user_id", ""))
-            user_name = msg.get("user_name", msg.get("username", ""))
+            user_id = msg.get("user") or msg.get("user_id", "")
+            user_name = msg.get("user_name") or msg.get("username", "")
             text = msg.get("text", "")
-            thread_ts = msg.get("thread_ts")
-            is_bot = bool(msg.get("bot_id") or msg.get("subtype") == "bot_message")
+            thread_ts = msg.get("thread_ts") or msg.get("thread_timestamp_unix")
+            is_bot = bool(
+                msg.get("bot_id")
+                or msg.get("subtype") == "bot_message"
+                or msg.get("post_type") == "bot"
+            )
 
             if storage.ingest_message(
                 ts=ts,
