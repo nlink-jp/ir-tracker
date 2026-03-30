@@ -21,11 +21,13 @@ def main() -> None:
     analyze_p = subparsers.add_parser("analyze", help="Analyze pending/stale segments")
     analyze_p.add_argument("--db", default="tracker.db", help="SQLite database path")
     analyze_p.add_argument("--verbose", "-v", action="store_true")
+    analyze_p.add_argument("--lang", "-l", default="", help="Translate after analysis (e.g. ja)")
 
     # status
     status_p = subparsers.add_parser("status", help="Output current timeline")
     status_p.add_argument("--db", default="tracker.db", help="SQLite database path")
     status_p.add_argument("--format", default="markdown", choices=["markdown", "json"])
+    status_p.add_argument("--lang", "-l", default="", help="Display in translated language (e.g. ja)")
 
     # segments
     segments_p = subparsers.add_parser("segments", help="List segments and states")
@@ -85,6 +87,9 @@ def _run_analyze(args) -> None:
     storage = Storage(args.db)
     try:
         count = analyze_pending(storage, verbose=args.verbose)
+        if args.lang and count > 0:
+            from ir_tracker.translator import translate_pending
+            translate_pending(storage, args.lang, verbose=args.verbose)
     finally:
         storage.close()
 
@@ -96,9 +101,9 @@ def _run_status(args) -> None:
     storage = Storage(args.db)
     try:
         if args.format == "json":
-            print(json.dumps(build_json_timeline(storage), ensure_ascii=False, indent=2))
+            print(json.dumps(build_json_timeline(storage, lang=args.lang), ensure_ascii=False, indent=2))
         else:
-            print(build_markdown_timeline(storage))
+            print(build_markdown_timeline(storage, lang=args.lang))
     finally:
         storage.close()
 

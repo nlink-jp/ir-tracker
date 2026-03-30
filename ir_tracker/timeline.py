@@ -17,7 +17,7 @@ def _ts_to_datetime(ts: str) -> str:
         return ts
 
 
-def build_markdown_timeline(storage: Storage) -> str:
+def build_markdown_timeline(storage: Storage, lang: str = "") -> str:
     """Build a Markdown timeline from all analyses."""
     analyses = storage.get_all_analyses()
     segments = storage.get_segments()
@@ -61,6 +61,21 @@ def build_markdown_timeline(storage: Storage) -> str:
         analysis = storage.get_analysis(seg["id"])
         if analysis:
             data = json.loads(analysis["analysis_json"])
+
+            # Overlay translation if requested and available
+            if lang:
+                trans_json = storage.get_translation(seg["id"], lang)
+                if trans_json:
+                    trans = json.loads(trans_json)
+                    data["summary"] = trans.get("summary", data.get("summary", ""))
+                    if trans.get("key_findings"):
+                        data["key_findings"] = trans["key_findings"]
+                    if trans.get("open_questions"):
+                        data["open_questions"] = trans["open_questions"]
+                    if trans.get("participants"):
+                        data["active_participants"] = trans["participants"]
+                    if trans.get("notable_events"):
+                        data["notable_events"] = trans["notable_events"]
 
             # Summary
             lines.append(data.get("summary", ""))
@@ -143,7 +158,7 @@ def build_markdown_timeline(storage: Storage) -> str:
     return "\n".join(lines)
 
 
-def build_json_timeline(storage: Storage) -> dict:
+def build_json_timeline(storage: Storage, lang: str = "") -> dict:
     """Build a JSON timeline from all analyses."""
     analyses = storage.get_all_analyses()
     segments = storage.get_segments()
@@ -162,6 +177,10 @@ def build_json_timeline(storage: Storage) -> dict:
         }
         if analysis:
             seg_data["analysis"] = json.loads(analysis["analysis_json"])
+            if lang:
+                trans_json = storage.get_translation(seg["id"], lang)
+                if trans_json:
+                    seg_data["translation"] = json.loads(trans_json)
         timeline_segments.append(seg_data)
 
     return {

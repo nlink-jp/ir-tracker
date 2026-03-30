@@ -42,6 +42,15 @@ CREATE TABLE IF NOT EXISTS timeline_context (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS analysis_translations (
+    segment_id  INTEGER NOT NULL,
+    lang        TEXT NOT NULL,
+    translation_json TEXT NOT NULL,
+    translated_at TEXT NOT NULL,
+    PRIMARY KEY (segment_id, lang),
+    FOREIGN KEY (segment_id) REFERENCES segments(id)
+);
 """
 
 
@@ -193,6 +202,35 @@ class Storage:
             "SELECT a.*, s.start_ts, s.end_ts, s.message_count "
             "FROM analyses a JOIN segments s ON a.segment_id = s.id "
             "ORDER BY s.start_ts ASC"
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    # ── Translations ──
+
+    def save_translation(self, segment_id: int, lang: str, translation_json: str) -> None:
+        self._db.execute(
+            "INSERT OR REPLACE INTO analysis_translations (segment_id, lang, translation_json, translated_at) "
+            "VALUES (?, ?, ?, ?)",
+            (segment_id, lang, translation_json, datetime.now().isoformat()),
+        )
+        self._db.commit()
+
+    def get_translation(self, segment_id: int, lang: str) -> str | None:
+        row = self._db.execute(
+            "SELECT translation_json FROM analysis_translations WHERE segment_id = ? AND lang = ?",
+            (segment_id, lang),
+        ).fetchone()
+        return row["translation_json"] if row else None
+
+    def get_untranslated_segments(self, lang: str) -> list[dict]:
+        """Return analyzed segments that have no translation for the given language."""
+        rows = self._db.execute(
+            "SELECT s.* FROM segments s "
+            "WHERE s.state = 'analyzed' "
+            "AND NOT EXISTS ("
+            "  SELECT 1 FROM analysis_translations t WHERE t.segment_id = s.id AND t.lang = ?"
+            ") ORDER BY s.start_ts ASC",
+            (lang,),
         ).fetchall()
         return [dict(r) for r in rows]
 
