@@ -19,7 +19,7 @@
   {% if stats.current_status %}
   <div class="stat">
     <div class="label">Status</div>
-    <div><span class="badge badge-status">{{ stats.current_status }}</span></div>
+    <div><span class="badge badge-status">{{ stats.current_status | upper }}</span></div>
   </div>
   {% endif %}
   {% if stats.current_severity %}
@@ -36,119 +36,134 @@
 </div>
 {% endif %}
 
-{# ── Timeline ── #}
-{% if segments %}
-<div class="timeline">
-  {% for seg in segments %}
-  <div class="segment {{ seg.state }}">
-    <div class="segment-header">
-      <span class="segment-time">{{ seg.start_display }} — {{ seg.end_display }}</span>
-      <span class="segment-count">{{ seg.message_count }} msgs</span>
-      {% if seg.state == 'analyzed' %}
-        <span class="badge badge-low">Analyzed</span>
-      {% elif seg.state == 'pending' %}
-        <span class="badge" style="background: var(--warning); color: white;">Pending</span>
-      {% elif seg.state == 'stale' %}
-        <span class="badge" style="background: var(--info); color: white;">Stale</span>
-      {% endif %}
-    </div>
-
-    {% if seg.analysis %}
-    <div class="segment-card">
-      <div class="segment-summary">{{ seg.analysis.summary }}</div>
-
-      {% if seg.analysis.key_findings %}
-      <div class="section-title">Key Findings</div>
-      <ul class="finding-list">
-        {% for f in seg.analysis.key_findings %}
-        <li>{{ f }}</li>
-        {% endfor %}
-      </ul>
-      {% endif %}
-
-      {% if seg.analysis.active_participants %}
-      <div class="section-title">Participants</div>
-      {% for p in seg.analysis.active_participants %}
-      <div class="participant">
-        <span class="participant-name">@{{ p.user_name }}</span>
-        <span class="participant-role">({{ p.inferred_role }})</span>
-        <span class="participant-activity">{{ p.current_activity }}</span>
-      </div>
-      {% endfor %}
-      {% endif %}
-
-      {% if seg.analysis.notable_events %}
-      <div class="section-title">Events</div>
-      {% for e in seg.analysis.notable_events %}
-      <div class="event">
-        <span class="event-time">{{ e.time }}</span>
-        {% if e.significance == 'high' %}
-          <span class="event-sig">🔴</span>
-        {% elif e.significance == 'medium' %}
-          <span class="event-sig">🟡</span>
-        {% else %}
-          <span class="event-sig">⚪</span>
-        {% endif %}
-        <span>{{ e.description }}</span>
-      </div>
-      {% endfor %}
-      {% endif %}
-
-      {% if seg.analysis.open_questions %}
-      <div class="section-title">Open Questions</div>
-      <ul class="question-list">
-        {% for q in seg.analysis.open_questions %}
-        <li>{{ q }}</li>
-        {% endfor %}
-      </ul>
-      {% endif %}
-    </div>
-    {% else %}
-    <div class="segment-card" style="color: var(--text-secondary); font-style: italic;">
-      Analysis pending — run <code>ir-tracker analyze</code>
-    </div>
-    {% endif %}
-  </div>
-  {% endfor %}
-</div>
-{% else %}
+{% if not segments %}
 <div style="text-align: center; color: var(--text-secondary); padding: 60px 0;">
   No data yet. Run <code>ir-tracker ingest &lt;export.json&gt;</code> to start.
 </div>
-{% endif %}
+{% else %}
 
-{# ── Cumulative Summary ── #}
-{% if cumulative %}
-<div class="summary-panel">
-  <h2>Cumulative Summary</h2>
+{# ── Two-column layout ── #}
+<div class="layout">
 
-  {% if cumulative.findings %}
-  <div class="section-title">{{ cumulative.findings | length }} Key Finding(s)</div>
-  <ul class="finding-list">
-    {% for f in cumulative.findings %}
-    <li>{{ f }}</li>
-    {% endfor %}
-  </ul>
-  {% endif %}
+  {# ── Left: Timeline (newest first) ── #}
+  <div>
+    <div class="timeline">
+      {% for seg in segments %}
+      <div class="segment {{ seg.state }}">
+        <div class="segment-header">
+          <span class="segment-time">{{ seg.start_display }} — {{ seg.end_display }}</span>
+          <span class="segment-count">{{ seg.message_count }} msgs</span>
+          {% if seg.state == 'analyzed' %}
+            <span class="badge badge-low">Analyzed</span>
+          {% elif seg.state == 'pending' %}
+            <span class="badge" style="background: var(--warning); color: white;">Pending</span>
+          {% elif seg.state == 'stale' %}
+            <span class="badge" style="background: var(--info); color: white;">Stale</span>
+          {% endif %}
+        </div>
 
-  {% if cumulative.participants %}
-  <div class="section-title">{{ cumulative.participants | length }} Participant(s)</div>
-  {% for user, activity in cumulative.participants.items() %}
-  <div class="participant">
-    <span class="participant-name">@{{ user }}</span>
-    <span class="participant-activity">{{ activity }}</span>
+        {% if seg.analysis %}
+        <div class="segment-card">
+          <div class="segment-summary">{{ seg.analysis.summary }}</div>
+
+          {% if seg.analysis.key_findings %}
+          <div class="section-title">Key Findings</div>
+          <ul class="finding-list">
+            {% for f in seg.analysis.key_findings %}<li>{{ f }}</li>{% endfor %}
+          </ul>
+          {% endif %}
+
+          {% if seg.analysis.active_participants %}
+          <div class="section-title">Participants</div>
+          {% for p in seg.analysis.active_participants %}
+          <div class="participant">
+            <span class="participant-name">@{{ p.user_name }}</span>
+            <span class="participant-role">({{ p.inferred_role }})</span>
+            <span class="participant-activity">{{ p.current_activity }}</span>
+          </div>
+          {% endfor %}
+          {% endif %}
+
+          {% if seg.analysis.notable_events %}
+          <div class="section-title">Events</div>
+          {% for e in seg.analysis.notable_events %}
+          <div class="event">
+            <span class="event-time">{{ e.time }}</span>
+            {% if e.significance == 'high' %}🔴{% elif e.significance == 'medium' %}🟡{% else %}⚪{% endif %}
+            <span>{{ e.description }}</span>
+          </div>
+          {% endfor %}
+          {% endif %}
+
+          {% if seg.analysis.open_questions %}
+          <div class="section-title">Open Questions</div>
+          <ul class="question-list">
+            {% for q in seg.analysis.open_questions %}<li>{{ q }}</li>{% endfor %}
+          </ul>
+          {% endif %}
+        </div>
+        {% else %}
+        <div class="segment-card" style="color: var(--text-secondary); font-style: italic;">
+          Analysis pending
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
   </div>
-  {% endfor %}
+
+  {# ── Right: Floating status panel ── #}
+  {% if cumulative %}
+  <div>
+    <div class="status-panel">
+      <h3>Current Situation</h3>
+
+      {% if stats.current_status %}
+      <div class="section">
+        <span class="badge badge-status">{{ stats.current_status | upper }}</span>
+        {% if stats.current_severity %}
+        <span class="badge badge-{{ stats.current_severity }}">{{ stats.current_severity | upper }}</span>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      {% if cumulative.participants %}
+      <div class="section">
+        <div class="section-title">Active ({{ cumulative.participants | length }})</div>
+        {% for user, activity in cumulative.participants.items() %}
+        <div class="participant">
+          <span class="participant-name">@{{ user }}</span>
+          <span class="participant-activity">{{ activity }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <hr class="status-divider">
+
+      {% if cumulative.findings %}
+      <div class="section">
+        <div class="section-title">Findings ({{ cumulative.findings | length }})</div>
+        <ul class="finding-list">
+          {% for f in cumulative.findings %}<li>{{ f }}</li>{% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+      <hr class="status-divider">
+
+      {% if cumulative.questions %}
+      <div class="section">
+        <div class="section-title">Open Questions ({{ cumulative.questions | length }})</div>
+        <ul class="question-list">
+          {% for q in cumulative.questions %}<li>{{ q }}</li>{% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+    </div>
+  </div>
   {% endif %}
 
-  {% if cumulative.questions %}
-  <div class="section-title">{{ cumulative.questions | length }} Open Question(s)</div>
-  <ul class="question-list">
-    {% for q in cumulative.questions %}
-    <li>{{ q }}</li>
-    {% endfor %}
-  </ul>
-  {% endif %}
 </div>
 {% endif %}
 

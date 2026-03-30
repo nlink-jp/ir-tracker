@@ -66,7 +66,7 @@ body {
 a { color: var(--accent); text-decoration: none; }
 a:hover { color: var(--accent-hover); }
 
-.container { max-width: 960px; margin: 0 auto; padding: 0 20px; }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
 
 /* Nav */
 nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 0; margin-bottom: 24px; }
@@ -147,3 +147,21 @@ nav .nav-link:hover { color: var(--text); }
 .lang-btn { padding: 3px 10px; border-radius: 12px; font-size: 12px; background: var(--bg); border: 1px solid var(--border); color: var(--text-secondary); cursor: pointer; }
 .lang-btn:hover { border-color: var(--accent); }
 .lang-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+
+/* Two-column layout */
+.layout { display: grid; grid-template-columns: 1fr 340px; gap: 24px; align-items: start; }
+@media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+
+/* Floating status panel */
+.status-panel {
+  position: sticky; top: 20px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 16px; box-shadow: var(--card-shadow);
+}
+.status-panel h3 { font-size: 14px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+.status-panel .section { margin-bottom: 16px; }
+.status-panel .section:last-child { margin-bottom: 0; }
+.status-panel .participant { font-size: 13px; }
+.status-panel .finding-list li, .status-panel .question-list li { font-size: 13px; }
+
+.status-divider { border: none; border-top: 1px solid var(--border); margin: 12px 0; }

@@ -74,11 +74,14 @@ def create_app(db_path: str) -> FastAPI:
                     item["analysis"] = data
                 seg_data.append(item)
 
+            # Reverse: newest first
+            seg_data.reverse()
+
             # Current status from latest analysis
             current_status = ""
             current_severity = ""
-            if seg_data and seg_data[-1]["analysis"]:
-                latest = seg_data[-1]["analysis"]
+            if seg_data and seg_data[0]["analysis"]:
+                latest = seg_data[0]["analysis"]
                 current_status = latest.get("status", "")
                 current_severity = latest.get("severity", "")
 
